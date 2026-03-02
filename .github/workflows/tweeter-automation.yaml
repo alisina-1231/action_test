@@ -11,13 +11,16 @@ on:
       - main
 
 jobs:
+  # --------------------------
+  # Run Go tests on multiple OS
+  # --------------------------
   test:
     permissions:
       contents: read
     strategy:
       matrix:
-        go-version: [ 1.24.4 ]
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        go-version: [1.24.4]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -30,6 +33,9 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+  # --------------------------
+  # Test the local action
+  # --------------------------
   test-action:
     permissions:
       contents: read
@@ -39,27 +45,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull versioned image
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            IMAGE_TAG=${GITHUB_REF#refs/tags/}
-          else
-            IMAGE_TAG=${GITHUB_SHA}
-          fi
-          docker pull ghcr.io/alisina-1231/tweet:latest
-
       - name: Test the tweeter action in DRY_RUN
         id: tweeterAction
         env:
           DRY_RUN: true
-        uses: ./
+        uses: ./   # local action
         with:
           message: hello world!
           accessToken: fake
@@ -70,6 +60,9 @@ jobs:
       - name: Print action output
         run: echo "${{ steps.tweeterAction.outputs.sentMessage }} from dry run test"
 
+  # --------------------------
+  # Release job: build & release binaries
+  # --------------------------
   release:
     permissions:
       contents: write
@@ -124,7 +117,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           jq -r .body tmp-release-notes.json > tmp-release-notes.md
-
           gh release create ${{ env.RELEASE_VERSION }} \
             -F tmp-release-notes.md \
             "${OUT_BASE}/darwin/amd64/tweeter_darwin_amd64.tar.gz" \
